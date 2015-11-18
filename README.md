@@ -1,1 +1,1 @@
-# keepalived
+修改check_tcp.c，让keepalived对断开tcp连接的处理更加优雅。
