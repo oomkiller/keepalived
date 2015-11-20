@@ -64,6 +64,61 @@ install_tcp_check_keyword(void)
 	install_sublevel_end();
 }
 
+static int
+    communicateWithMySql(int socketfd)
+{
+    int len;
+    char buf[MAXBUF+1];
+
+    bzero(buf,MAXBUF+1);
+    len = recv(socketfd, buf, MAXBUF, 0);
+ //   log_message(LOG_INFO, "Get %d size from mysql first!",len);
+    if(len >0)
+    {
+        bzero(buf,MAXBUF+1);
+        buf[0] = 0x1;
+        buf[1] = 0x0;
+        buf[2] = 0x0;
+        buf[3] = 0x0;
+        buf[4] = 0xe;
+        len = send(socketfd, buf, 5, 0);
+     //   log_message(LOG_INFO,"Want send %d buffer and send %d buffer",5,len);
+        if(len < 0)
+            log_message(LOG_ERR,"Send Failed ! Error code is %d,Error Message is '%s'", errno, strerror(errno));
+        else if(len >0)
+        {
+            bzero(buf,MAXBUF+1);
+            len = recv(socketfd,buf,MAXBUF,0);
+         //   log_message(LOG_INFO, "Get %d size from mysql last!",len);
+            if(len >5)
+            {
+                if(buf[4] == 0x0)   //OK
+                {
+                    return 0;
+                }
+                else if(buf[4] == 0xFF)  //ERROR
+                    return 1;
+            }
+        }
+    }
+    return 1;
+}
+
+static int sendQuit(int sockfd)
+{
+    char buf[MAXBUF+1];
+    int len;
+    bzero(buf,MAXBUF+1);
+    buf[0] = 0x1;
+    buf[1] = 0x0;
+    buf[2] = 0x0;
+    buf[3] = 0x0;
+    buf[4] = 0x1;
+    len = send(sockfd, buf, 5, 0);
+    if(len < 0)
+            log_message(LOG_ERR,"Send Failed ! Error code is %d,Error Message is '%s'", errno, strerror(errno));
+}
+
 int
 tcp_check_thread(thread_t * thread)
 {
@@ -78,23 +133,40 @@ tcp_check_thread(thread_t * thread)
 	 * Otherwise we have a real connection error or connection timeout.
 	 */
 	if (status == connect_success) {
-		char buf[100];
-		ssize_t readnum;
-		memset(buf, 100, 0);
-		readnum = recv(thread->u.fd, (void*)buf, 100, MSG_WAITALL);
-		fflush(stdout);
-		close(thread->u.fd);
 
-		if (!svr_checker_up(checker->id, checker->rs)) {
-			log_message(LOG_INFO, "TCP connection to %s success."
-					, FMT_TCP_RS(checker));
-			smtp_alert(checker->rs, NULL, NULL,
-				   "UP",
-				   "=> TCP CHECK succeed on service <=");
-			update_svr_checker_state(UP, checker->id
-						   , checker->vs
-						   , checker->rs);
-		}
+        if(communicateWithMySql(thread->u.fd))
+        {
+            sendQuit(thread->u.fd);
+            shutdown(thread->u.fd,SHUT_RDWR);
+            close(thread->u.fd);
+           if (svr_checker_up(checker->id, checker->rs))
+            {
+                log_message(LOG_INFO, "TCP connection to %s failed !!!", FMT_TCP_RS(checker));
+                smtp_alert(checker->rs, NULL, NULL,
+                                        "DOWN",
+                                        "=> TCP CHECK failed on service <=");
+                update_svr_checker_state(DOWN, checker->id
+                                            , checker->vs
+                                            , checker->rs);
+            }
+        }
+        else
+        {
+            sendQuit(thread->u.fd);
+            shutdown(thread->u.fd,SHUT_RDWR);
+    		close(thread->u.fd);
+
+    		if (!svr_checker_up(checker->id, checker->rs)) {
+    			log_message(LOG_INFO, "TCP connection to %s success."
+    					, FMT_TCP_RS(checker));
+    			smtp_alert(checker->rs, NULL, NULL,
+    				   "UP",
+    				   "=> TCP CHECK succeed on service <=");
+    			update_svr_checker_state(UP, checker->id
+    						   , checker->vs
+    						   , checker->rs);
+    		}
+        }
 
 	} else {
 
