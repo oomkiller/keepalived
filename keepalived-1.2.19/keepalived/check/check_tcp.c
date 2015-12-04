@@ -107,16 +107,24 @@ static int
 static int sendQuit(int sockfd)
 {
     char buf[MAXBUF+1];
-    int len;
+    int len =5;
     bzero(buf,MAXBUF+1);
     buf[0] = 0x1;
     buf[1] = 0x0;
     buf[2] = 0x0;
     buf[3] = 0x0;
     buf[4] = 0x1;
-    len = send(sockfd, buf, 5, 0);
-    if(len < 0)
-            log_message(LOG_ERR,"Send Failed ! Error code is %d,Error Message is '%s'", errno, strerror(errno));
+    while(len >0){
+    	int n = send(sockfd, buf, len, 0);
+    	if(n>0){
+    		len -= n;  
+				continue; 
+    	}else{
+        log_message(LOG_ERR,"Send Failed ! Error code is %d,Error Message is '%s'", errno, strerror(errno));
+        return n;
+      }
+    }
+    return 1;
 }
 
 int
