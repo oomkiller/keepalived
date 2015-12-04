@@ -144,7 +144,6 @@ tcp_check_thread(thread_t * thread)
 
         if(communicateWithMySql(thread->u.fd))
         {
-            sendQuit(thread->u.fd);
             shutdown(thread->u.fd,SHUT_RDWR);
             close(thread->u.fd);
            if (svr_checker_up(checker->id, checker->rs))
@@ -160,9 +159,8 @@ tcp_check_thread(thread_t * thread)
         }
         else
         {
-            sendQuit(thread->u.fd);
             shutdown(thread->u.fd,SHUT_RDWR);
-    		close(thread->u.fd);
+    				close(thread->u.fd);
 
     		if (!svr_checker_up(checker->id, checker->rs)) {
     			log_message(LOG_INFO, "TCP connection to %s success."
