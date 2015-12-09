@@ -106,6 +106,9 @@ static int
 
 static int sendQuit(int sockfd)
 {
+		//we're not going to read the response
+	  shutdown(sockfd,SHUT_RD);
+	  
     char buf[MAXBUF+1];
     int len =5;
     bzero(buf,MAXBUF+1);
@@ -124,7 +127,8 @@ static int sendQuit(int sockfd)
         return n;
       }
     }
-    return 1;
+   return 1;
+    
 }
 
 int
@@ -144,7 +148,8 @@ tcp_check_thread(thread_t * thread)
 
         if(communicateWithMySql(thread->u.fd))
         {
-            shutdown(thread->u.fd,SHUT_RDWR);
+            sendQuit(thread->u.fd);
+            shutdown(thread->u.fd,SHUT_WR);
             close(thread->u.fd);
            if (svr_checker_up(checker->id, checker->rs))
             {
@@ -159,7 +164,8 @@ tcp_check_thread(thread_t * thread)
         }
         else
         {
-            shutdown(thread->u.fd,SHUT_RDWR);
+            sendQuit(thread->u.fd);
+            shutdown(thread->u.fd,SHUT_WR);
     				close(thread->u.fd);
 
     		if (!svr_checker_up(checker->id, checker->rs)) {
